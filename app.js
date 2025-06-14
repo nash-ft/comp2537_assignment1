@@ -3,6 +3,7 @@ const express = require('express');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.use(express.urlencoded({extended: false}));
 
 // Routes
 app.get('/', (req, res) => {
@@ -13,7 +14,8 @@ app.get('/', (req, res) => {
         <a href="/cat/1">Cat 1</a><br>
         <a href="/cat/2">Cat 2</a><br>
         <a href="/cat/3">Cat 3?</a><br>
-        <a href="/dne">Broken Link (goes to 404 page)</a>`);
+        <a href="/dne">Broken Link (goes to 404 page)</a><br>
+        <a href="/contact">Contact Form</a>`);
 });
 
 app.get('/about', (req,res) => {
@@ -34,6 +36,31 @@ app.get('/cat/:id', (req,res) => {
     }
     else {
         res.send("Invalid cat id: "+cat);
+    }
+});
+
+app.get('/contact', (req,res) => {
+    var missingEmail = req.query.missing;
+    var html = `
+        email address:
+        <form action='/submitEmail' method='post'>
+            <input name='email' type='text' placeholder='email'>
+            <button>Submit</button>
+        </form>
+    `;
+    if (missingEmail) {
+        html += "<br> email is required";
+    }
+    res.send(html);
+});
+
+app.post('/submitEmail', (req,res) => {
+    var email = req.body.email;
+    if (!email) {
+        res.redirect('/contact?missing=1');
+    }
+    else {
+        res.send("Thanks for subscribing with your email: "+email);
     }
 });
 
