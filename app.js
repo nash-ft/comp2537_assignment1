@@ -3,6 +3,9 @@ const express = require('express');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+//Users and Passwords (in memory 'database')
+var users = []; 
+
 app.use(express.urlencoded({extended: false}));
 
 // Routes
@@ -15,7 +18,8 @@ app.get('/', (req, res) => {
         <a href="/cat/2">Cat 2</a><br>
         <a href="/cat/3">Cat 3?</a><br>
         <a href="/dne">Broken Link (goes to 404 page)</a><br>
-        <a href="/contact">Contact Form</a>`);
+        <a href="/contact">Contact Form</a><br>
+        <a href="/createUser">Create User</a><br>`);
 });
 
 app.get('/about', (req,res) => {
@@ -62,6 +66,34 @@ app.post('/submitEmail', (req,res) => {
     else {
         res.send("Thanks for subscribing with your email: "+email);
     }
+});
+
+app.get('/createUser', (req,res) => {
+    var html = `
+    <form action='/submitUser' method='post'>
+    <input name='username' type='text' placeholder='username'>
+    <input name='password' type='password' placeholder='password'>
+    <button>Submit</button>
+    </form>
+    `;
+    res.send(html);
+});
+
+app.post('/submitUser', (req,res) => {
+    var username = req.body.username;
+    var password = req.body.password;
+
+    users.push({ username: username, password: password });
+
+    console.log(users);
+
+    var usershtml = "";
+    for (i = 0; i < users.length; i++) {
+        usershtml += "<li>" + users[i].username + ": " + users[i].password + "</li>";
+    }
+
+    var html = "<ul>" + usershtml + "</ul>";
+    res.send(html);
 });
 
 app.use(express.static(__dirname + "/public"));
