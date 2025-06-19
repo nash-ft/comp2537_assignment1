@@ -1,3 +1,9 @@
+V1.12 - Logout - how to end your session.
+=========================================
+Go to /logout
+This will end the session by deleting the server side record for the session.
+(This will invalidate the client side cookie)
+
 v1.11 - NoSQL Injection demo (caught by Joi and Mongo Sanitizer)
 ================================================================
 See /nosql-injection for instructions on how to demo an SQL Injection

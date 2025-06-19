@@ -121,7 +121,9 @@ app.get('/', (req, res) => {
         <a href="/createUser">Create User</a><br>
         <a href="/login">Login</a><br>
         <a href="/loggedin">Logged In Page</a><br>
-        <a href="/nosql-injection">NoSQL Injection Example</a><br>`);
+        <a href="/nosql-injection">NoSQL Injection Example</a><br>
+        <a href="/logout">Logout</a><br>
+    `);
 });
 
 app.get('/about', (req,res) => {
@@ -262,6 +264,14 @@ app.get('/loggedin', (req,res) => {
     }
     var html = `
     You are logged in!
+    `;
+    res.send(html);
+});
+
+app.get('/logout', (req,res) => {
+	req.session.destroy();
+    var html = `
+    You are logged out.
     `;
     res.send(html);
 });
