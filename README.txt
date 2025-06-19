@@ -1,3 +1,10 @@
+v1.11 - NoSQL Injection demo (caught by Joi and Mongo Sanitizer)
+================================================================
+See /nosql-injection for instructions on how to demo an SQL Injection
+
+The demo explains that you can use Postman to simulate a POST request
+with a carefully created body payload to perform an NoSQL Injection Attack.
+
 v1.10 - MongoDB for creating users and login.
 =============================================
 Adding another MongoDB database for the users and BCrypted passwords.
