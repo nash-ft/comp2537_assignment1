@@ -9,8 +9,10 @@ const saltRounds = 12;
 const app = express();
 
 const Joi = require("joi");
-const mongoSanitizer = require('mongo-sanitizer').default;
+// const mongoSanitizer = require('mongo-sanitizer').default;
 //import mongoSanitizer from 'mongo-sanitizer';
+const mongoSanitize = require('express-mongo-sanitize');
+
 
 const PORT = process.env.PORT || 3000;
 const expireTime = 24 * 60 * 60 * 1000; //expires after 1 day  (hours * minutes * seconds * millis)
@@ -32,9 +34,25 @@ const userCollection = database.db(mongodb_user_database).collection('users');
 app.use(express.urlencoded({extended: false}));
 app.use(express.json());
 
-app.use(mongoSanitizer(
-    { replaceWith: '_'}
+// app.use(mongoSanitizer(
+//     { replaceWith: '_'}
+// ));
+
+//Hack for express 5.x not setting req.query as writable 
+app.use((req, _res, next) => {
+	Object.defineProperty(req, 'query', {
+		...Object.getOwnPropertyDescriptor(req, 'query'),
+		value: req.query,
+		writable: true,
+	});
+
+	next();
+})
+
+app.use(mongoSanitize(
+    {replaceWith: '%'}
 ));
+
 
 var mongoStore = MongoStore.create({
 	mongoUrl: `mongodb+srv://${mongodb_user}:${mongodb_password}@${mongodb_host}/${mongodb_session_database}`,
@@ -83,7 +101,7 @@ app.post('/nosql-injection', async (req,res) => {
 		res.send(`<h3>no user provided - try /nosql-injection?user=name</h3> <h3>or /nosql-injection?user[$ne]=name</h3>`);
 		return;
 	}
-	console.log("user: "+username);
+	console.log("user: ",username);
 
 	const schema = Joi.string().max(20).required();
 	const validationResult = schema.validate(username);
