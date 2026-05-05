@@ -2,8 +2,8 @@ require('./utils.js');
 require('dotenv').config(); 
 const express = require('express');
 const session = require('express-session');
-const MongoStore = require('connect-mongo');
-const bcrypt = require('bcrypt');
+const MongoStore = require('connect-mongo').default;
+const bcrypt = require('bcrypt');   
 const saltRounds = 12;
 
 const app = express();
@@ -18,9 +18,9 @@ const PORT = process.env.PORT || 3000;
 const expireTime = 24 * 60 * 60 * 1000; //expires after 1 day  (hours * minutes * seconds * millis)
 
 /* secret information section */
-const mongodb_host = process.env.MONGODB_HOST;
-const mongodb_user = process.env.MONGODB_USER;
-const mongodb_password = process.env.MONGODB_PASSWORD;
+// const mongodb_host = process.env.MONGODB_HOST;
+// const mongodb_user = process.env.MONGODB_USER;
+// const mongodb_password = process.env.MONGODB_PASSWORD;
 const mongodb_user_database = process.env.MONGODB_USER_DATABASE;
 const mongodb_session_database = process.env.MONGODB_SESSION_DATABASE;
 const mongodb_session_secret = process.env.MONGODB_SESSION_SECRET;
@@ -28,44 +28,64 @@ const mongodb_session_secret = process.env.MONGODB_SESSION_SECRET;
 const node_session_secret = process.env.NODE_SESSION_SECRET;
 /* END secret section */
 
-const {database} = include('databaseConnection');
-const userCollection = database.db(mongodb_user_database).collection('users');
+// const { database } = include('databaseConnection');
+
+// const userCollection = database.db(process.env.MONGODB_USER_DATABASE).collection('users');
+
+const client = require('./databaseConnection');
+const userCollection = client.db(mongodb_user_database).collection('users');
 
 app.use(express.urlencoded({extended: false}));
 app.use(express.json());
 
-// app.use(mongoSanitizer(
+// app.use(mongoSanitize(
 //     { replaceWith: '_'}
 // ));
 
-//Hack for express 5.x not setting req.query as writable 
-app.use((req, _res, next) => {
-	Object.defineProperty(req, 'query', {
-		...Object.getOwnPropertyDescriptor(req, 'query'),
-		value: req.query,
-		writable: true,
-	});
+// // Hack for express 5.x not setting req.query as writable 
+// app.use((req, _res, next) => {
+// 	Object.defineProperty(req, 'query', {
+// 		...Object.getOwnPropertyDescriptor(req, 'query'),
+// 		value: req.query,
+// 		writable: true,
+// 	});
 
-	next();
-})
+// 	next();
+// })
 
-app.use(mongoSanitize(
-    {replaceWith: '%'}
-));
+// app.use(mongoSanitize(
+//     {replaceWith: '%'}
+// ));
 
+app.use(mongoSanitize());
 
-var mongoStore = MongoStore.create({
-	mongoUrl: `mongodb+srv://${mongodb_user}:${mongodb_password}@${mongodb_host}/${mongodb_session_database}`,
-	crypto: {
-		secret: mongodb_session_secret
-	}
+// var mongoStore = MongoStore.create({
+// 	mongoUrl: `mongodb://${mongodb_user}:${mongodb_password}@${mongodb_host}/${mongodb_session_database}`,
+// 	crypto: {
+// 		secret: mongodb_session_secret
+// 	}
+// });
+
+// const mongoStore = MongoStore.create({
+//     mongoUrl: process.env.MONGODB_URI,
+//     crypto: {
+//         secret: mongodb_session_secret
+//     }
+// });
+
+const mongoStore = MongoStore.create({
+    mongoUrl: process.env.MONGODB_URI,
+    dbName: mongodb_session_database,
+    crypto: {
+        secret: mongodb_session_secret
+    }
 });
 
 app.use(session({ 
     secret: node_session_secret,
 	store: mongoStore, //default is memory store 
 	saveUninitialized: false, 
-	resave: true
+	resave: false
 }
 ));
 
@@ -127,178 +147,165 @@ app.post('/nosql-injection', async (req,res) => {
 
 // Routes
 app.get('/', (req, res) => {
+    if (!req.session.authenticated) {
+        return res.send(`
+            <h3>Welcome to the Home Page</h3>
+            <button><a href='/signup'>Sign Up</a></button><br>
+            <button><a href='/login'>Log In</a></button>
+        `);
+    }
+
     res.send(`
-        <h1>Hello, World!</h1>
-        <a href="/about?color=blue">About (Blue)</a><br>
-        <a href="/about?color=orange">About (Orange)</a><br>
-        <a href="/cat/1">Cat 1</a><br>
-        <a href="/cat/2">Cat 2</a><br>
-        <a href="/cat/3">Cat 3?</a><br>
-        <a href="/dne">Broken Link (goes to 404 page)</a><br>
-        <a href="/contact">Contact Form</a><br>
-        <a href="/createUser">Create User</a><br>
-        <a href="/login">Login</a><br>
-        <a href="/loggedin">Logged In Page</a><br>
-        <a href="/nosql-injection">NoSQL Injection Example</a><br>
-        <a href="/logout">Logout</a><br>
+        <h3>Hello, ${req.session.name}!</h3>
+        <button><a href='/members'>Members</a></button><br><br>
+        <button><a href='/logout'>Logout</a></button>
     `);
 });
 
-app.get('/about', (req,res) => {
-    var color = req.query.color;
+app.get('/signup', (req, res) => {
+    res.send(`
+        <h1>Sign Up</h1>
 
-    res.send("<h1 style='color:"+color+";'>Patrick Guichon</h1>");
-});
-
-app.get('/cat/:id', (req,res) => {
-
-    var cat = req.params.id;
-
-    if (cat == 1) {
-        res.send("Fluffy: <img src='/fluffy.gif' style='width:250px;'>");
-    }
-    else if (cat == 2) {
-        res.send("Socks: <img src='/socks.gif' style='width:250px;'>");
-    }
-    else {
-        res.send("Invalid cat id: "+cat);
-    }
-});
-
-app.get('/contact', (req,res) => {
-    var missingEmail = req.query.missing;
-    var html = `
-        email address:
-        <form action='/submitEmail' method='post'>
-            <input name='email' type='text' placeholder='email'>
-            <button>Submit</button>
+        <form action="/signup" method="post">
+            <input name="name" placeholder="Name"><br>
+            <input name="email" placeholder="Email"><br>
+            <input name="password" type="password" placeholder="Password"><br>
+            <button>Sign Up</button>
         </form>
-    `;
-    if (missingEmail) {
-        html += "<br> email is required";
-    }
-    res.send(html);
+
+        <a href="/">Back</a>
+    `);
 });
 
-app.post('/submitEmail', (req,res) => {
-    var email = req.body.email;
-    if (!email) {
-        res.redirect('/contact?missing=1');
-    }
-    else {
-        res.send("Thanks for subscribing with your email: "+email);
-    }
-});
+app.post('/signup', async (req,res) => {
+    const {name, email, password} = req.body;
 
-app.get('/createUser', (req,res) => {
-    var html = `
-    create user
-    <form action='/submitUser' method='post'>
-    <input name='username' type='text' placeholder='username'>
-    <input name='password' type='password' placeholder='password'>
-    <button>Submit</button>
-    </form>
-    `;
-    res.send(html);
-});
+    //Joi validation for the signup form
+    const schema = Joi.object(
+        {
+            name: Joi.string().max(30).required(),
+            email: Joi.string().email().required(),
+            password: Joi.string().max(30).required()
+        });
+    
+    const validationResult = schema.validate({name, email, password});
 
-app.post('/submitUser', async (req,res) => {
-    var username = req.body.username;
-    var password = req.body.password;
-
-	const schema = Joi.object(
-		{
-			username: Joi.string().alphanum().max(20).required(),
-			password: Joi.string().max(20).required()
-		});
-	
-	const validationResult = schema.validate({username, password});
-	if (validationResult.error != null) {
-        console.log(validationResult.error);
-        res.redirect("/createUser");
-        return;
+    if (validationResult.error) {
+        return res.send(`
+            <h3>Missing or invalid input</h3>
+            <a href='/signup'>Try again</a>
+            `);
     }
 
-    var hashedPassword = await bcrypt.hash(password, saltRounds);
-	
-	await userCollection.insertOne({username: username, password: hashedPassword});
-	console.log("Inserted user");
+    const existingUser = await userCollection.findOne({email});
 
-    var html = "successfully created user";
-    res.send(html);
+    if (existingUser) {
+        return res.send(`
+            <h3>User already exists</h3>
+            <a href='/signup'>Try again</a>
+            `);
+    }
+
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    await userCollection.insertOne({
+        name, 
+        email,
+        password: hashedPassword
+    });
+
+    // Creating session
+    req.session.authenticated = true;
+    req.session.name = name;
+    req.session.email = email;
+
+    res.redirect('/members');
 });
 
 app.get('/login', (req,res) => {
-    var html = `
-    log in
-    <form action='/loggingin' method='post'>
-    <input name='username' type='text' placeholder='username'>
-    <input name='password' type='password' placeholder='password'>
-    <button>Submit</button>
-    </form>
-    `;
-    res.send(html);
+    res.send(`
+        <h1>Login</h1>
+        <form action='/login' method='post'>
+            <input name='email' placeholder='email'><br>
+            <input name='password' type='password' placeholder='Password'><br>
+            <button>Login</button>
+        </form>
+    `);
 });
 
-app.post('/loggingin', async (req,res) => {
-    var username = req.body.username;
-    var password = req.body.password;
+app.post('/login', async (req,res) => {
+    const {email, password} = req.body;
 
-	const schema = Joi.string().max(20).required();
-	const validationResult = schema.validate(username);
-	if (validationResult.error != null) {
-        console.log(validationResult.error);
-        res.redirect("/login");
-        return;
-	}
+    const schema = Joi.object(
+        {
+            email: Joi.string().email().required(),
+            password: Joi.string().required()
+        });
+    
+    const validationResult = schema.validate({email, password});
 
-	const result = await userCollection.find({username: username}).project({username: 1, password: 1, _id: 1}).toArray();
-
-	console.log(result);
-	if (result.length != 1) {
-		console.log("user not found");
-		res.redirect("/login");
-		return;
-	}
-	if (await bcrypt.compare(password, result[0].password)) {
-		console.log("correct password");
-		req.session.authenticated = true;
-		req.session.username = username;
-		req.session.cookie.maxAge = expireTime;
-
-		res.redirect('/loggedIn');
-		return;
-	}
-	else {
-		console.log("incorrect password");
-		res.redirect("/login");
-		return;
-	}
-});
-
-app.get('/loggedin', (req,res) => {
-    if (!req.session.authenticated) {
-        res.redirect('/login');
+    if (validationResult.error) {
+        return res.send(`
+            <h3>Invalid input</h3>
+            <a href='/login'>Try again</a>
+            `);
     }
-    var html = `
-    You are logged in!
-    `;
-    res.send(html);
+
+    const user = await userCollection.findOne({email});
+
+    if (!user) {
+        return res.send(`
+            <h3>User not found</h3>
+            <a href='/login'>Try again</a>
+            `);
+    }
+
+    const match = await bcrypt.compare(password, user.password);
+
+    if (!match) {
+        return res.send(`
+            <h3>Incorrect password</h3>
+            <a href='/login'>Try again</a>
+            `);
+    }
+
+    req.session.authenticated = true;
+    req.session.name = user.name;
+    req.session.email = user.email;
+
+    res.redirect('/members');
+});
+
+app.get('/members', (req,res) => {
+    if (!req.session.authenticated) {
+        return res.redirect('/');
+    }
+
+    const images = ['/img1.jpg', '/img2.jpg', '/img3.jpg'];
+    const randomImage = images[Math.floor(Math.random() * images.length)];
+
+    res.send(`
+        <h1>Welcome, ${req.session.name}!</h1>
+        <img src='${randomImage}' style='width:300px;'><br><br>
+        <button><a href='/logout'>Logout</a></button>
+    `);
 });
 
 app.get('/logout', (req,res) => {
-	req.session.destroy();
-    var html = `
-    You are logged out.
-    `;
-    res.send(html);
+    req.session.destroy(() => {
+        res.redirect('/');
+    });
 });
 
 app.use(express.static(__dirname + "/public"));
 
 app.use((req,res) => {
 	res.status(404);
-	res.send("Page not found - 404");
+	res.send(`
+        <h1>404 - Not Found</h1>
+        <p>The page you are looking for does not exist.</p>
+        <button><a href='/'>Go to Home</a></button>
+    `);
 });
 
 // Start server
